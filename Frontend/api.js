@@ -100,7 +100,7 @@ async function apiFetch(path, options = {}) {
         if (err.name === "TypeError" && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
             console.error(`CareerAI backend connection failed at ${API_BASE}${path}:`, err);
 
-            // If Render backend failed and we are running in a browser that can reach localhost, try local fallback
+            // 1. If Render backend failed and we are running in a browser that can reach localhost, try local fallback
             if (API_BASE.includes("onrender.com") && window.location.protocol !== "https:") {
                 try {
                     console.warn("Render backend unreachable. Attempting fallback to local backend at http://127.0.0.1:8000...");
@@ -108,6 +108,17 @@ async function apiFetch(path, options = {}) {
                     if (fallbackRes) {
                         API_BASE = "http://127.0.0.1:8000";
                         return fallbackRes;
+                    }
+                } catch (_) {}
+            }
+
+            // 2. Check if current origin serves the API (self-hosted unified backend)
+            if (API_BASE && window.location.origin && API_BASE !== window.location.origin) {
+                try {
+                    const selfRes = await fetch(window.location.origin + path, { ...options, headers });
+                    if (selfRes && (selfRes.ok || selfRes.status === 400 || selfRes.status === 422)) {
+                        API_BASE = "";
+                        return selfRes;
                     }
                 } catch (_) {}
             }

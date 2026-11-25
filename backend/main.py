@@ -114,3 +114,20 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+# Mount Frontend static files so CareerAI can run as a complete full-stack app
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+frontend_path = Path(__file__).resolve().parent.parent / "Frontend"
+if frontend_path.exists():
+    @app.get("/")
+    def serve_root():
+        index_file = frontend_path / "index.html"
+        if index_file.exists():
+            return FileResponse(index_file)
+        return {"message": f"Welcome to {settings.app_name}"}
+
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+
