@@ -71,6 +71,25 @@ function requireAuth() {
     return true;
 }
 
+// ---- Safe JSON parser helper ----
+async function safeParseJson(res) {
+    const text = await res.text();
+    if (!text || !text.trim()) {
+        if (!res.ok) {
+            throw new Error(`Server returned status ${res.status}.`);
+        }
+        return {};
+    }
+    try {
+        return JSON.parse(text);
+    } catch (_) {
+        if (!res.ok) {
+            throw new Error(`Server returned status ${res.status}: ${text.slice(0, 120)}`);
+        }
+        throw new Error("Invalid response format from server.");
+    }
+}
+
 // ---- Base fetch wrapper ----
 async function apiFetch(path, options = {}) {
     const token = getToken();
@@ -100,25 +119,14 @@ async function apiFetch(path, options = {}) {
         if (err.name === "TypeError" && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
             console.error(`CareerAI backend connection failed at ${API_BASE}${path}:`, err);
 
-            // 1. If Render backend failed and we are running in a browser that can reach localhost, try local fallback
+            // If Render backend failed and we are running in a browser that can reach localhost, try local fallback
             if (API_BASE.includes("onrender.com") && window.location.protocol !== "https:") {
                 try {
                     console.warn("Render backend unreachable. Attempting fallback to local backend at http://127.0.0.1:8000...");
                     const fallbackRes = await fetch("http://127.0.0.1:8000" + path, { ...options, headers });
-                    if (fallbackRes) {
+                    if (fallbackRes && fallbackRes.headers.get("content-type")?.includes("application/json")) {
                         API_BASE = "http://127.0.0.1:8000";
                         return fallbackRes;
-                    }
-                } catch (_) {}
-            }
-
-            // 2. Check if current origin serves the API (self-hosted unified backend)
-            if (API_BASE && window.location.origin && API_BASE !== window.location.origin) {
-                try {
-                    const selfRes = await fetch(window.location.origin + path, { ...options, headers });
-                    if (selfRes && (selfRes.ok || selfRes.status === 400 || selfRes.status === 422)) {
-                        API_BASE = "";
-                        return selfRes;
                     }
                 } catch (_) {}
             }
@@ -139,7 +147,7 @@ async function apiSignup(name, email, password) {
         method: "POST",
         body: JSON.stringify({ name, email, password, user_type: "student" }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Signup failed.");
     return data; // { id, email, name, user_type }
 }
@@ -149,7 +157,7 @@ async function apiLogin(email, password) {
         method: "POST",
         body: JSON.stringify({ email, password }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Login failed.");
     setToken(data.access_token);
     return data;
@@ -158,7 +166,7 @@ async function apiLogin(email, password) {
 // ---- Users ----
 async function apiGetMe() {
     const res = await apiFetch("/users/me");
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not load profile.");
     return data; // { id, email, name, user_type }
 }
@@ -168,14 +176,13 @@ async function apiUpdateMe(name) {
         method: "PUT",
         body: JSON.stringify({ name }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not update profile.");
     return data;
 }
 
 // ---- Resumes ----
 async function apiUploadResume(file) {
-    // file = File object from <input type="file">
     const formData = new FormData();
     formData.append("file", file);
     const res = await apiFetch("/resumes/upload", {
@@ -183,7 +190,7 @@ async function apiUploadResume(file) {
         body: formData,
         headers: {}, // let browser set Content-Type for multipart
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Resume upload failed.");
     return data; // ResumeOut: { id, source, content_json, file_url, created_at }
 }
@@ -191,7 +198,7 @@ async function apiUploadResume(file) {
 async function apiGetResume() {
     const res = await apiFetch("/resumes/");
     if (res.status === 404) return null;
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not load resume.");
     return data; // ResumeOut
 }
@@ -200,7 +207,7 @@ async function apiGetResume() {
 async function apiGetReports(resumeId) {
     const res = await apiFetch(`/reports/resume/${resumeId}`);
     if (res.status === 404) return [];
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not load reports.");
     return data; // list[ReportOut]
 }
@@ -212,7 +219,7 @@ async function apiGenerateAtsReport(resumeId, jobDescription = null) {
     const res = await apiFetch(`/reports/generate/${resumeId}${params}`, {
         method: "POST",
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "ATS report generation failed.");
     return data; // ReportOut
 }
@@ -220,7 +227,7 @@ async function apiGenerateAtsReport(resumeId, jobDescription = null) {
 // ---- Interview ----
 async function apiStartInterview() {
     const res = await apiFetch("/interview/start", { method: "POST" });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not start interview.");
     return data; // { success, question }
 }
@@ -230,19 +237,18 @@ async function apiSubmitAnswer(answer) {
         method: "POST",
         body: JSON.stringify({ answer }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Could not submit answer.");
     return data; // { success, completed, next_question }
 }
 
 async function apiTranscribeSpeech(audioBlob) {
-    // audioBlob = Blob from MediaRecorder (WAV)
     const res = await apiFetch("/speech/transcribe", {
         method: "POST",
         body: audioBlob,
         headers: { "Content-Type": "audio/wav" },
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Transcription failed.");
     return data; // { success, text }
 }
@@ -250,7 +256,7 @@ async function apiTranscribeSpeech(audioBlob) {
 // ---- Jobs ----
 async function apiGetJobs() {
     const res = await apiFetch("/jobs");
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error("Could not load jobs.");
     return data.jobs; // array of job objects
 }
@@ -265,7 +271,7 @@ async function apiMatchJob(jobTitle, jobDescription) {
             job_description: jobDescription,
         }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Matching failed.");
     return data; // JobMatchOut
 }
@@ -280,7 +286,7 @@ async function apiApplyJob(jobTitle, companyName, jobUrl) {
             job_url: jobUrl || "",
         }),
     });
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) throw new Error(data.detail || "Application failed.");
     return data;
 }
