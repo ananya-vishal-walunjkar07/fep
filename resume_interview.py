@@ -4,7 +4,6 @@ import subprocess
 import time
 
 import speech_recognition as sr
-import sounddevice as sd
 import numpy as np
 
 from dotenv import load_dotenv
@@ -106,11 +105,18 @@ recognizer = sr.Recognizer()
 
 def listen():
     """
-    Record the user's answer.
+    Record the user's answer (Local CLI mode only).
 
     ENTER = start
     ENTER = stop
     """
+    try:
+        import sounddevice as sd
+    except (ImportError, OSError):
+        print("\nNote: sounddevice/PortAudio is not available for direct microphone recording.")
+        print("In web deployment, recording is handled by the browser.")
+        print("For local CLI mode, you can type your answer below:")
+        return input("Your answer: ")
 
     input("\nPress ENTER to START recording...")
 
