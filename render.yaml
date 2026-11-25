@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: career-ai-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: APP_NAME
+        value: CareerAI
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.1-flash-lite
+      - key: CORS_ORIGINS
+        value: "https://career-ai-frontend.onrender.com,https://careerai-frontend.onrender.com"
+
+  - type: web
+    name: career-ai-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    rootDir: Frontend
+    staticPublishPath: .

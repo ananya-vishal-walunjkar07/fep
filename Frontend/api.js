@@ -4,25 +4,49 @@
 // ============================================================
 
 function getApiBase() {
+    // 1. Explicit window override
     if (window.CAREERAI_API_BASE) {
         return window.CAREERAI_API_BASE;
     }
-    const isLocal = 
-        window.location.protocol === "file:" ||
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname === "0.0.0.0" ||
-        window.location.hostname.startsWith("192.168.") ||
-        window.location.hostname.startsWith("10.") ||
-        window.location.hostname === "";
 
-    if (isLocal) {
-        return "http://127.0.0.1:8000";
+    // 2. Query parameter override (e.g. ?api=local, ?api=render, or ?api=http://...)
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const apiParam = urlParams.get("api") || urlParams.get("backend");
+        if (apiParam) {
+            if (apiParam === "local") return "http://127.0.0.1:8000";
+            if (apiParam === "render" || apiParam === "production") return "https://career-ai-backend-a9ie.onrender.com";
+            if (apiParam.startsWith("http://") || apiParam.startsWith("https://")) return apiParam;
+        }
+    } catch (_) {}
+
+    // 3. Stored user preference
+    try {
+        const stored = localStorage.getItem("careerai_api_base");
+        if (stored) return stored;
+    } catch (_) {}
+
+    // 4. Production Cloud Detection:
+    // Only use Render if the page is explicitly served over HTTPS from a known cloud host
+    const hostname = window.location.hostname || "";
+    const protocol = window.location.protocol || "";
+
+    const isProductionHost = protocol === "https:" && (
+        hostname.endsWith(".onrender.com") ||
+        hostname.endsWith(".vercel.app") ||
+        hostname.endsWith(".netlify.app") ||
+        hostname.endsWith(".github.io")
+    );
+
+    if (isProductionHost) {
+        return "https://career-ai-backend-a9ie.onrender.com";
     }
-    return "https://career-ai-backend-a9ie.onrender.com";
+
+    // Default to local backend for all local environments (localhost, 127.0.0.1, file:, 192.168.*, 10.*, 172.*, etc.)
+    return "http://127.0.0.1:8000";
 }
 
-const API_BASE = getApiBase();
+let API_BASE = getApiBase();
 
 // ---- Token Storage ----
 function getToken() {
@@ -75,7 +99,24 @@ async function apiFetch(path, options = {}) {
     } catch (err) {
         if (err.name === "TypeError" && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
             console.error(`CareerAI backend connection failed at ${API_BASE}${path}:`, err);
-            throw new Error(`Unable to connect to CareerAI backend at ${API_BASE}. Make sure the backend server is running on port 8000.`);
+
+            // If Render backend failed and we are running in a browser that can reach localhost, try local fallback
+            if (API_BASE.includes("onrender.com") && window.location.protocol !== "https:") {
+                try {
+                    console.warn("Render backend unreachable. Attempting fallback to local backend at http://127.0.0.1:8000...");
+                    const fallbackRes = await fetch("http://127.0.0.1:8000" + path, { ...options, headers });
+                    if (fallbackRes) {
+                        API_BASE = "http://127.0.0.1:8000";
+                        return fallbackRes;
+                    }
+                } catch (_) {}
+            }
+
+            if (API_BASE.includes("127.0.0.1") || API_BASE.includes("localhost")) {
+                throw new Error(`Unable to connect to local backend at ${API_BASE}. Make sure the backend server is running (uvicorn main:app --port 8000).`);
+            } else {
+                throw new Error(`Unable to connect to production backend at ${API_BASE}. The service is currently inactive on Render (x-render-routing: no-server). Please resume or redeploy it in your Render dashboard.`);
+            }
         }
         throw err;
     }
