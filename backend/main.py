@@ -44,6 +44,7 @@ if settings.cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=default_origins,
+    allow_origin_regex=r"https://.*\.onrender\.com",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

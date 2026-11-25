@@ -6,7 +6,7 @@
 const API_BASE = window.CAREERAI_API_BASE || 
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
         ? "http://127.0.0.1:8000" 
-        : window.location.origin);
+        : "https://career-ai-backend-a9ie.onrender.com");
 
 // ---- Token Storage ----
 function getToken() {
