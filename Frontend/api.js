@@ -20,10 +20,14 @@ function getApiBase() {
         }
     } catch (_) {}
 
-    // 3. Stored user preference
+    // 3. Stored user preference (auto-clean outdated URLs)
     try {
         const stored = localStorage.getItem("careerai_api_base");
-        if (stored) return stored;
+        if (stored && stored.includes("career-ai-backend-a9ie")) {
+            localStorage.removeItem("careerai_api_base");
+        } else if (stored) {
+            return stored;
+        }
     } catch (_) {}
 
     // 4. Production Cloud Detection:
