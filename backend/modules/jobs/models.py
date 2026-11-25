@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import JSON
 from sqlalchemy.sql import func
 from core.database import Base
 
@@ -11,7 +11,7 @@ class Job(Base):
     title = Column(String, nullable=False)
     company = Column(String, nullable=False)
     location = Column(String, nullable=True)
-    required_skills = Column(JSONB, nullable=True)
+    required_skills = Column(JSON, nullable=True)
     description = Column(Text, nullable=True)
     job_url = Column(String, nullable=False)
     source = Column(String, nullable=True)

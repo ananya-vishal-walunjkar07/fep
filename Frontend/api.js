@@ -3,10 +3,26 @@
 // All backend calls go through these functions.
 // ============================================================
 
-const API_BASE = window.CAREERAI_API_BASE || 
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
-        ? "http://127.0.0.1:8000" 
-        : "https://career-ai-backend-a9ie.onrender.com");
+function getApiBase() {
+    if (window.CAREERAI_API_BASE) {
+        return window.CAREERAI_API_BASE;
+    }
+    const isLocal = 
+        window.location.protocol === "file:" ||
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname === "0.0.0.0" ||
+        window.location.hostname.startsWith("192.168.") ||
+        window.location.hostname.startsWith("10.") ||
+        window.location.hostname === "";
+
+    if (isLocal) {
+        return "http://127.0.0.1:8000";
+    }
+    return "https://career-ai-backend-a9ie.onrender.com";
+}
+
+const API_BASE = getApiBase();
 
 // ---- Token Storage ----
 function getToken() {
@@ -44,15 +60,25 @@ async function apiFetch(path, options = {}) {
         headers["Content-Type"] = "application/json";
     }
 
-    const res = await fetch(API_BASE + path, { ...options, headers });
+    try {
+        const res = await fetch(API_BASE + path, { ...options, headers });
 
-    if (res.status === 401) {
-        clearToken();
-        window.location.href = "login.html";
-        throw new Error("Session expired. Please log in again.");
+        if (res.status === 401) {
+            clearToken();
+            if (!window.location.pathname.endsWith("login.html") && !window.location.pathname.endsWith("signup.html")) {
+                window.location.href = "login.html";
+            }
+            throw new Error("Invalid credentials or session expired.");
+        }
+
+        return res;
+    } catch (err) {
+        if (err.name === "TypeError" && (err.message.includes("fetch") || err.message.includes("NetworkError"))) {
+            console.error(`CareerAI backend connection failed at ${API_BASE}${path}:`, err);
+            throw new Error(`Unable to connect to CareerAI backend at ${API_BASE}. Make sure the backend server is running on port 8000.`);
+        }
+        throw err;
     }
-
-    return res;
 }
 
 // ---- Auth ----
