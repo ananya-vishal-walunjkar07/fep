@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+
+# Environments & Sensitive Credentials (DO NOT COMMIT)
+.env
+.env.*
+*.env
+.envrc
+.venv/
+env/
+venv/
+ENV/
+
+# Uploaded user files
+uploaded_resumes/
+*.pdf
+
+# Editor & OS artifacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Node / Package managers
+node_modules/

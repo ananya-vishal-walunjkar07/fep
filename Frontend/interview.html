@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>CareerAI - Interview</title>
+    <link rel="icon" type="image/png" href="logoo.png">
+    <link rel="stylesheet" href="style.css?v=20261025v">
+
+    
+</head>
+
+<body class="interview-body">
+
+    <!-- ================= NAVBAR ================= -->
+    <nav class="navbar">
+
+        <a href="home.html" class="logo">
+            <img src="logoo.png" alt="CareerAI Logo" class="logo-image">
+        </a>
+
+        <div class="nav-links">
+            <a href="home.html">Home</a>
+            <a href="dashboard.html">Dashboard</a>
+            <a href="interview.html" class="active">AI Interview</a>
+            <a href="profile.html">Profile</a>
+        </div>
+
+        <div class="nav-buttons">
+            <a href="dashboard.html" class="back-btn" style="color: white; font-weight: 600; text-decoration: none; padding: 7px 16px; border: 1px solid rgba(255,255,255,0.25); border-radius: 8px; font-size: 14px;">← Back to Dashboard</a>
+        </div>
+
+    </nav>
+
+
+    <!-- ================= MAIN INTERVIEW AREA ================= -->
+
+    <main class="interview-container">
+
+        <!-- Heading -->
+
+        <div class="interview-heading">
+
+            <h1>Your Personalised AI Powered Interview</h1>
+
+            <p>
+                Let us dive deep in your career journey and understand your skills, experiences and aspirations.
+
+            </p>
+
+        </div>
+
+
+        <!-- ================= CHAT AREA ================= -->
+
+        <section class="interview-box">
+
+            <div class="chat-area" id="chatArea">
+
+
+                <!-- ===== CARA INTRO MESSAGE ===== -->
+
+                <div class="message-row cara-row" id="introMessage">
+
+                    <div class="avatar-container cara-avatar intro-avatar">
+
+                        <img
+                            src="cursor.png"
+                            alt="Cara"
+                            class="cara-image"
+                        >
+
+                    </div>
+
+                    <div class="message-content">
+
+                        <div class="speaker-name">
+                            Cara
+                        </div>
+
+                        <div class="chat-bubble cara-bubble">
+
+                            <p>
+                                Hi! I'm CarA, your AI powered CareerAI assistant. Lets us resume generation process by starting your interview.
+                            </p>
+
+                            <p>
+                                Hit that start button as soon as you are ready to begin! Lets create a smashing resume together.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ===== START BUTTON ===== -->
+
+                <div class="start-interview-wrapper" id="startWrapper">
+
+                    <button
+                        class="start-interview-btn"
+                        id="startInterviewBtn"
+                    >
+                        Start Interview
+                    </button>
+
+                </div>
+
+
+                <!-- ===== QUESTIONS WILL BE ADDED HERE BY JS ===== -->
+
+            </div>
+
+
+            <!-- ================= RECORDING AREA ================= -->
+
+            <div
+                class="recording-panel"
+                id="recordingPanel"
+                style="display: none;"
+            >
+
+                <div class="recording-status" id="recordingStatus">
+
+                    <span class="recording-dot"></span>
+
+                    <span id="recordingText">
+                        Ready to record
+                    </span>
+
+                </div>
+
+
+                <div class="recording-controls">
+
+                    <button
+                        class="record-btn"
+                        id="recordBtn"
+                    >
+
+                        🎙️
+                        <span id="recordBtnText">
+                            Start Recording
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="stop-btn"
+                        id="stopBtn"
+                        disabled
+                    >
+
+                        ⏹ Stop
+
+                    </button>
+
+                </div>
+
+
+                <p class="recording-hint">
+                    Speak naturally. There is no typing required.
+                </p>
+
+            </div>
+
+
+            <!-- ================= NEXT / FINISH ================= -->
+
+            <div
+                class="next-section"
+                id="nextSection"
+                style="display: none;"
+            >
+
+                <button
+                    class="next-question-btn"
+                    id="nextQuestionBtn"
+                >
+                    Next Question →
+                </button>
+
+            </div>
+
+
+        </section>
+
+
+        <!-- ================= PROGRESS ================= -->
+
+        <div class="interview-progress">
+
+            <div class="progress-text">
+
+                <span id="progressText">
+                    Question 0 of 5
+                </span>
+
+            </div>
+
+            <div class="progress-bar">
+
+                <div
+                    class="progress-fill"
+                    id="progressFill"
+                ></div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+
+        <!-- ================= FOOTER ================= -->
+    <footer class="site-footer">
+
+        <div class="footer-top">
+
+            <div class="footer-brand">
+                <a href="home.html">
+                    <img src="logoo.png" alt="CareerAI Logo" class="footer-logo-img">
+                </a>
+                <p>
+                    Your dedicated AI-powered career companion. Helping students, professionals build resumes, optimize them, make them ATS friendly, and finding the right opportunities for them.
+                </p>
+            </div>
+
+            <div class="footer-col">
+                <h4>Navigation</h4>
+                <ul>
+                    <li><a href="home.html">Home</a></li>
+                    <li><a href="dashboard.html">Dashboard</a></li>
+                    <li><a href="profile.html">My Profile</a></li>
+                    <li><a href="login.html">Logout</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-col">
+                <h4>Tools</h4>
+                <ul>
+                    <li><a href="interview.html">AI Interview</a></li>
+                    <li><a href="resume.html">Resume Optimizer</a></li>
+                    <li><a href="ats.html">ATS Score Checker</a></li>
+                    <li><a href="dashboard.html">Job Matcher</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-col">
+                <h4>Contact & Help</h4>
+                <ul>
+                    <li><a href="mailto:support@careerai.com">support@careerai.com</a></li>
+                    <li><a href="profile.html#settings">Account Settings</a></li>
+                    <li><a href="profile.html#contact">Help Center</a></li>
+                </ul>
+            </div>
+
+        </div>
+
+        <div class="footer-bottom">
+            <p class="footer-copy">&copy; 2026 CareerAI.</p>
+            <p class="footer-tagline">Build your career with confidence.</p>
+            <p class="footer-subtext">Designed with precision for students and professionals.</p>
+        </div>
+
+    </footer>
+
+    <!-- ================= JAVASCRIPT ================= -->
+
+    <script src="api.js"></script>
+    <script src="script.js?v=20261025v"></script>
+
+</body>
+
+</html>
