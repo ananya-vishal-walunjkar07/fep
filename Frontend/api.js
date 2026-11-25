@@ -15,7 +15,7 @@ function getApiBase() {
         const apiParam = urlParams.get("api") || urlParams.get("backend");
         if (apiParam) {
             if (apiParam === "local") return "http://127.0.0.1:8000";
-            if (apiParam === "render" || apiParam === "production") return "https://career-ai-backend-a9ie.onrender.com";
+            if (apiParam === "render" || apiParam === "production") return "https://career-ai-backend-a9je.onrender.com";
             if (apiParam.startsWith("http://") || apiParam.startsWith("https://")) return apiParam;
         }
     } catch (_) {}
@@ -39,7 +39,7 @@ function getApiBase() {
     );
 
     if (isProductionHost) {
-        return "https://career-ai-backend-a9ie.onrender.com";
+        return "https://career-ai-backend-a9je.onrender.com";
     }
 
     // Default to local backend for all local environments (localhost, 127.0.0.1, file:, 192.168.*, 10.*, 172.*, etc.)
