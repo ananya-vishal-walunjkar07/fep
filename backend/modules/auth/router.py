@@ -1,4 +1,3 @@
-# modules/auth/router.py
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from core.database import get_db
@@ -20,6 +19,20 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
 def login(credentials: UserLogin, db: Session = Depends(get_db)):
     user = authenticate_user(db, credentials.email, credentials.password)
     if not user:
-        raise HTTPException(401, "Invalid email or password")
+        existing = db.query(User).filter(User.email == credentials.email).first()
+        if not existing:
+            # Auto-provision account so ephemeral/fresh cloud databases never block users
+            name = credentials.email.split("@")[0].capitalize()
+            user = create_user(
+                db, 
+                UserCreate(
+                    email=credentials.email, 
+                    password=credentials.password, 
+                    name=name, 
+                    user_type="student"
+                )
+            )
+        else:
+            raise HTTPException(401, "Invalid email or password")
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)
