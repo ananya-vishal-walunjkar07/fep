@@ -61,16 +61,36 @@ if (signupForm) {
             return;
         }
 
+        const submitBtn = signupForm.querySelector("button[type='submit']");
+        const originalBtnText = submitBtn ? submitBtn.textContent : "Create Account";
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Creating account...";
+        }
+
+        message.style.color = "#4a69bd";
         message.textContent = "Creating your account...";
         try {
             await apiSignup(fullName, userEmail, userPassword);
             message.style.color = "#157347";
             message.textContent = "Account created successfully! Redirecting to login...";
             if (typeof showConfetti === "function") showConfetti();
-            setTimeout(function () {
-                window.location.href = "login.html";
-            }, 1200);
+            // Seamless transition straight to dashboard
+            try {
+                await apiLogin(userEmail, userPassword);
+                const user = await apiGetMe();
+                localStorage.setItem("careerai_user", JSON.stringify(user));
+                message.textContent = "Redirecting to your dashboard...";
+                setTimeout(function () {
+                    window.location.href = "dashboard.html";
+                }, 600);
+            } catch (_) {
+                setTimeout(function () {
+                    window.location.href = "login.html";
+                }, 800);
+            }
         } catch (error) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
             message.style.color = "#c62828";
             message.textContent = error.message || "Unable to save your account. Please try again.";
         }
@@ -108,6 +128,7 @@ if (loginForm) {
                 window.location.href = "dashboard.html";
             }, 1000);
         } catch (error) {
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
             message.style.color = "#c62828";
             message.textContent = error.message || "Invalid email or password. Please try again.";
         }
