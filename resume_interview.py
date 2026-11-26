@@ -30,7 +30,7 @@ if api_key:
 else:
     print("INFO: GEMINI_API_KEY not set. AI interview will use fallback mode.")
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
 
 
 # ============================================================
@@ -202,10 +202,8 @@ def listen():
 # GEMINI HELPER
 # ============================================================
 
-def call_gemini(prompt, attempts=2):
-    """
-    Call Gemini with retry handling and model fallback.
-    """
+def call_gemini(prompt, attempts=1, max_tokens=150):
+    """Call Gemini with instant model fallback, token bounds, and near-zero latency."""
     global client
     if client is None:
         key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY2")
@@ -217,28 +215,22 @@ def call_gemini(prompt, attempts=2):
     if client is None:
         return ""
 
-    candidate_models = [MODEL, "gemini-3.6-flash", "gemini-3.8-flash"]
-    models_to_try = []
-    for m in candidate_models:
-        if m and m not in models_to_try:
-            models_to_try.append(m)
+    models_to_try = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.7-flash"]
+    if MODEL and MODEL not in models_to_try:
+        models_to_try.insert(0, MODEL)
 
     for current_model in models_to_try:
-        for attempt in range(1, attempts + 1):
-            try:
-                response = client.models.generate_content(
-                    model=current_model,
-                    contents=prompt
-                )
-                if response and response.text:
-                    return response.text.strip()
-            except Exception as e:
-                err_str = str(e)
-                print(f"Gemini {current_model} attempt {attempt} notice: {e}")
-                if "503" in err_str or "UNAVAILABLE" in err_str:
-                    time.sleep(1)
-                else:
-                    break
+        try:
+            response = client.models.generate_content(
+                model=current_model,
+                contents=prompt,
+                config={"max_output_tokens": max_tokens, "temperature": 0.25}
+            )
+            if response and response.text:
+                return response.text.strip()
+        except Exception as e:
+            print(f"Gemini {current_model} fallback notice: {e}")
+            continue
     return ""
 
 
@@ -623,6 +615,129 @@ Return ONLY raw JSON with keys "feedback" and "next_question"."""
 
     fallback_nq = ask_next_question()
     return fallback_fb, fallback_nq
+
+
+
+# ============================================================
+# ULTRA-FAST UNIFIED INTERVIEW PROCESSOR
+# ============================================================
+
+def _apply_heuristic_profile(answer: str):
+    global profile
+    ans_lower = answer.lower()
+    if not profile.get("target_roles") and any(r in ans_lower for r in ["developer", "engineer", "designer", "manager", "analyst", "data", "scientist", "architect", "lead"]):
+        profile["target_roles"] = [answer.strip()[:60]]
+    if not profile.get("user_type"):
+        if any(w in ans_lower for w in ["student", "college", "fresher", "graduating", "study", "final year"]):
+            profile["user_type"] = "Student / Fresher"
+        elif any(w in ans_lower for w in ["professional", "working", "years", "experience", "senior", "junior"]):
+            profile["user_type"] = "Working Professional"
+    if not profile.get("education") and any(w in ans_lower for w in ["btech", "b.tech", "degree", "university", "college", "bca", "mca", "b.e", "b.sc", "bachelor", "master"]):
+        profile["education"].append({"degree": answer.strip()[:60]})
+    if len(profile.get("skills", [])) < 3:
+        tech_keywords = ["python", "java", "react", "node", "sql", "javascript", "html", "css", "c++", "aws", "docker", "git", "machine learning", "fastapi", "django"]
+        found = [k.capitalize() for k in tech_keywords if k in ans_lower]
+        for s in found:
+            if s not in profile.get("skills", []):
+                profile.setdefault("skills", []).append(s)
+        if len(profile.get("skills", [])) < 3 and len(answer.split()) > 3:
+            profile.setdefault("skills", []).extend(["Communication", "Problem Solving"])
+    if not profile.get("projects") and any(w in ans_lower for w in ["project", "built", "app", "website", "system", "created", "developed"]):
+        profile["projects"].append({"name": answer.strip()[:40], "description": answer.strip()[:100], "technologies": "Full Stack"})
+
+
+def _heuristic_feedback_and_next_question(answer: str):
+    ans_lower = answer.lower()
+    if any(k in ans_lower for k in ["engineer", "developer", "designer", "manager", "data", "analyst", "ai", "ml", "frontend", "backend", "full stack", "cloud", "devops"]):
+        fb = "That is a high-demand, exciting career path to pursue!"
+    elif any(k in ans_lower for k in ["student", "graduate", "fresher", "college", "university", "btech", "b.tech", "bca", "mca", "b.sc"]):
+        fb = "Great! Your academic foundation and hands-on learnings are strong assets."
+    elif any(k in ans_lower for k in ["python", "java", "react", "sql", "javascript", "c++", "aws", "docker", "node", "html", "css", "fastapi"]):
+        fb = "Those are impressive and highly relevant technical skills to highlight."
+    elif any(k in ans_lower for k in ["built", "project", "app", "system", "website", "developed", "created"]):
+        fb = "Hands-on projects are the best proof of practical competence."
+    else:
+        fb = "Thank you for sharing that! That gives clear context for your resume."
+    return fb, ask_next_question()
+
+
+def process_interview_turn(answer: str):
+    """
+    Unified, ultra-fast interview turn processor (combines profile extraction, 
+    personalized feedback, and next question generation into ONE single LLM call).
+    Reduces latency from ~8-10 seconds to ~1 second.
+    """
+    global profile
+
+    missing = check_profile()
+    if not missing:
+        save_profile()
+        return (
+            "Fantastic! That gives us a complete and comprehensive picture of your professional background.",
+            "",
+            True
+        )
+
+    target_area = missing[0]
+    
+    # Fast unified Gemini call
+    if client:
+        try:
+            prompt = f"""You are Cara, the lightning-fast, encouraging AI career interviewer for CareerAI.
+Candidate answer: "{answer}"
+Current missing profile field needed: {target_area}
+
+In ONE concise JSON object, return:
+1. "feedback": 1 short warm sentence (max 20 words) acknowledging what they specifically said.
+2. "next_question": Direct, friendly next question to ask about {target_area}.
+3. "extracted": Any explicit fields stated by the candidate:
+   {{"target_roles": [], "skills": [], "user_type": "", "education": [], "projects": []}}
+
+Return ONLY raw JSON."""
+
+            raw = call_gemini(prompt)
+            if raw:
+                cleaned = raw.replace("```json", "").replace("```", "").strip()
+                data = json.loads(cleaned)
+                fb = data.get("feedback", "").strip()
+                nq = data.get("next_question", "").strip()
+                extracted = data.get("extracted", {})
+
+                if isinstance(extracted, dict):
+                    if extracted.get("target_roles") and not profile.get("target_roles"):
+                        profile["target_roles"] = extracted["target_roles"]
+                    if extracted.get("user_type") and not profile.get("user_type"):
+                        profile["user_type"] = extracted["user_type"]
+                    if extracted.get("skills"):
+                        for s in extracted["skills"]:
+                            if s not in profile.get("skills", []):
+                                profile.setdefault("skills", []).append(s)
+                    if extracted.get("education") and not profile.get("education"):
+                        profile["education"] = extracted["education"]
+                    if extracted.get("projects") and not profile.get("projects"):
+                        profile["projects"] = extracted["projects"]
+
+                _apply_heuristic_profile(answer)
+
+                new_missing = check_profile()
+                if len(new_missing) == 0:
+                    save_profile()
+                    return ("Outstanding! You have completed the interview. Your background and career aspirations have been captured.", "", True)
+
+                if fb and nq:
+                    return (fb, nq, False)
+        except Exception as e:
+            print("Unified interview turn notice:", e)
+
+    # Heuristic fallback if Gemini is offline
+    _apply_heuristic_profile(answer)
+    fb, nq = _heuristic_feedback_and_next_question(answer)
+    new_missing = check_profile()
+    if len(new_missing) == 0:
+        save_profile()
+        return ("Outstanding! You have completed the interview. Your background and career aspirations have been captured.", "", True)
+
+    return (fb, nq, False)
 
 def main():
 

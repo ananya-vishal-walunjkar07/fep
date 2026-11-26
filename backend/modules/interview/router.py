@@ -83,45 +83,21 @@ def submit_answer(data: AnswerRequest):
             }
 
     try:
-        interview_ai.update_profile(data.answer)
-
-        missing = interview_ai.check_profile()
-
-        if not missing:
-            interview_ai.save_profile()
-            return {
-                "success": True,
-                "completed": True,
-                "feedback": "Outstanding! You have completed the interview. Your background and career aspirations have been captured.",
-                "next_question": "",
-            }
-
-        fb, question = interview_ai.generate_feedback_and_next_question(data.answer)
-
+        fb, question, completed = interview_ai.process_interview_turn(data.answer)
         return {
             "success": True,
-            "completed": False,
+            "completed": completed,
             "feedback": fb,
             "next_question": question,
         }
-
     except Exception as exc:
         print("Submit answer notice:", exc)
-        try:
-            fb, question = interview_ai.generate_feedback_and_next_question(data.answer)
-            return {
-                "success": True,
-                "completed": False,
-                "feedback": fb,
-                "next_question": question,
-            }
-        except Exception:
-            return {
-                "success": True,
-                "completed": False,
-                "feedback": "Thank you for sharing that!",
-                "next_question": interview_ai.ask_next_question(),
-            }
+        return {
+            "success": True,
+            "completed": False,
+            "feedback": "Thank you for sharing that!",
+            "next_question": interview_ai.ask_next_question(),
+        }
 
 
 @speech_router.post("/speech/transcribe")

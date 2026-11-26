@@ -1420,7 +1420,7 @@ function initRealInterview() {
         row.scrollIntoView({ behavior: "smooth" });
     }
 
-    function showCaraTypingIndicator() {
+        function showCaraTypingIndicator() {
         const row = document.createElement("div");
         row.className = "message-row cara-row typing-indicator-row";
         row.id = "caraTypingRow";
@@ -1430,10 +1430,11 @@ function initRealInterview() {
             </div>
             <div class="message-content">
                 <div class="speaker-name">Cara</div>
-                <div class="chat-bubble cara-bubble" style="padding: 10px 16px;">
-                    <p style="margin: 0; color: #625b56; font-style: italic; font-size: 14px;">
-                        Listening and preparing response...
-                    </p>
+                <div class="chat-bubble cara-bubble typing-bubble">
+                    <span class="typing-label">Cara is listening</span>
+                    <span class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </span>
                 </div>
             </div>
         `;
