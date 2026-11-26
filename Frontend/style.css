@@ -9737,8 +9737,8 @@ main.dashboard {
 .dashboard-grid {
     display: grid !important;
     grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 22px !important;
-    max-width: 1240px !important;
+    gap: 26px !important;
+    max-width: 1440px !important;
     margin: 0 auto !important;
     width: 100% !important;
 }
@@ -9746,14 +9746,14 @@ main.dashboard {
 .dashboard-card {
     background: var(--bg-cream-warm, #FFF9EF) !important;
     border: 1.5px solid var(--border-warm, rgba(104, 19, 19, 0.14)) !important;
-    border-radius: 20px !important;
-    padding: 22px 22px 18px !important;
+    border-radius: 22px !important;
+    padding: 26px 24px 22px !important;
     box-shadow: 0 4px 18px rgba(104, 19, 19, 0.06) !important;
     transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: unset !important;
+    min-height: 290px !important;
 }
 
 .dashboard-card:hover {
@@ -9796,10 +9796,10 @@ main.dashboard {
 }
 
 .dashboard-gif {
-    width: 115px !important;
-    height: 115px !important;
+    width: 140px !important;
+    height: 140px !important;
     object-fit: contain !important;
-    margin-left: 12px !important;
+    margin-left: 14px !important;
     flex-shrink: 0 !important;
     transition: transform 0.3s ease !important;
 }
@@ -9845,8 +9845,8 @@ main.dashboard {
 
 /* CAREER STATS STRIP COMPACT */
 .dashboard-stats-strip {
-    margin: 30px auto 0 !important;
-    max-width: 1240px !important;
+    margin: 32px auto 0 !important;
+    max-width: 1440px !important;
     background: #FFFDF7 !important;
     border: 1.5px solid rgba(104, 19, 19, 0.16) !important;
     border-radius: 20px !important;
