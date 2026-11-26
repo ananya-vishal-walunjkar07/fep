@@ -4457,15 +4457,17 @@ body {
 }
 
 
-.small-heading {
-    color: #a04444;
+.ats-container .small-heading,
+.page-heading .small-heading {
+    color: #7d1717;
 
-    font-size: 11px;
+    font-size: 16.5px;
     font-weight: 800;
 
-    letter-spacing: 1.5px;
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
 
-    margin-bottom: 7px;
+    margin-bottom: 8px;
 }
 
 
@@ -5343,15 +5345,16 @@ body {
     margin-bottom: 35px;
 }
 
-.small-heading {
+.ats-container .small-heading {
     margin: 0 0 8px;
 
     color: #7d1717;
 
-    font-size: 12px;
+    font-size: 16.5px;
     font-weight: 800;
 
-    letter-spacing: 1.5px;
+    letter-spacing: 2.2px;
+    text-transform: uppercase;
 }
 
 .page-heading h1 {
