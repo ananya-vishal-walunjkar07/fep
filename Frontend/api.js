@@ -259,10 +259,26 @@ async function apiTranscribeSpeech(audioBlob) {
 
 // ---- Jobs ----
 async function apiGetJobs() {
-    const res = await apiFetch("/jobs");
-    const data = await safeParseJson(res);
-    if (!res.ok) throw new Error("Could not load jobs.");
-    return data.jobs; // array of job objects
+    try {
+        const res = await apiFetch("/jobs");
+        const data = await safeParseJson(res);
+        if (res.ok && data) {
+            if (Array.isArray(data.jobs)) return data.jobs;
+            if (Array.isArray(data)) return data;
+        }
+    } catch (err) {
+        console.warn("Backend /jobs fetch failed, attempting jobs.json fallback...", err);
+    }
+
+    // High availability fallback: loads smart_hiring jobs.json directly
+    try {
+        const fallbackRes = await fetch("jobs.json");
+        const fallbackData = await safeParseJson(fallbackRes);
+        if (fallbackData && Array.isArray(fallbackData.jobs)) return fallbackData.jobs;
+        if (Array.isArray(fallbackData)) return fallbackData;
+    } catch (_) {}
+
+    return [];
 }
 
 // ---- Job Matching ----
