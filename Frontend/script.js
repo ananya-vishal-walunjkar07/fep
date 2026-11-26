@@ -49,6 +49,8 @@ if (signupForm) {
     const emailInput = document.getElementById("signupEmail");
     const passwordInput = document.getElementById("signupPassword");
     const message = document.getElementById("signupMessage");
+    const submitBtn = signupForm.querySelector("button[type='submit']") || signupForm.querySelector(".form-button");
+    const originalBtnText = submitBtn ? submitBtn.textContent : "Create Account";
 
     signupForm.addEventListener("submit", async function (event) {
         event.preventDefault();
@@ -57,12 +59,11 @@ if (signupForm) {
         const userPassword = passwordInput ? passwordInput.value : "";
 
         if (!fullName || !userEmail || !userPassword) {
+            message.style.color = "#c62828";
             message.textContent = "Please fill in all the fields.";
             return;
         }
 
-        const submitBtn = signupForm.querySelector("button[type='submit']");
-        const originalBtnText = submitBtn ? submitBtn.textContent : "Create Account";
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.textContent = "Creating account...";
@@ -70,29 +71,35 @@ if (signupForm) {
 
         message.style.color = "#4a69bd";
         message.textContent = "Creating your account...";
+
         try {
             await apiSignup(fullName, userEmail, userPassword);
             message.style.color = "#157347";
-            message.textContent = "Account created successfully! Redirecting to login...";
+            message.textContent = "Account created successfully! Redirecting to login page...";
             if (typeof showConfetti === "function") showConfetti();
-            // Seamless transition straight to dashboard
-            try {
-                await apiLogin(userEmail, userPassword);
-                const user = await apiGetMe();
-                localStorage.setItem("careerai_user", JSON.stringify(user));
-                message.textContent = "Redirecting to your dashboard...";
-                setTimeout(function () {
-                    window.location.href = "dashboard.html";
-                }, 600);
-            } catch (_) {
-                setTimeout(function () {
-                    window.location.href = "login.html";
-                }, 800);
-            }
+
+            setTimeout(function () {
+                window.location.href = "login.html?email=" + encodeURIComponent(userEmail);
+            }, 800);
+
         } catch (error) {
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = originalBtnText; }
+            const errText = error.message || "";
+            // If already signed up, redirect to login page immediately
+            if (errText.toLowerCase().includes("already registered") || errText.toLowerCase().includes("already exists")) {
+                message.style.color = "#157347";
+                message.textContent = "Account already exists! Redirecting to login page...";
+                setTimeout(function () {
+                    window.location.href = "login.html?email=" + encodeURIComponent(userEmail);
+                }, 800);
+                return;
+            }
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
             message.style.color = "#c62828";
-            message.textContent = error.message || "Unable to save your account. Please try again.";
+            message.textContent = errText || "Unable to save your account. Please try again.";
         }
     });
 }
@@ -107,6 +114,16 @@ if (loginForm) {
     const message = document.getElementById("loginMessage");
     const submitBtn = loginForm.querySelector("button[type='submit']") || loginForm.querySelector(".form-button");
     const originalBtnText = submitBtn ? submitBtn.textContent : "Login";
+
+    // Auto-fill email if passed in query param from signup
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const emailParam = urlParams.get("email");
+        if (emailParam && emailInput) {
+            emailInput.value = emailParam;
+            if (passwordInput) passwordInput.focus();
+        }
+    } catch (_) {}
 
     loginForm.addEventListener("submit", async function (event) {
         event.preventDefault();
@@ -124,7 +141,7 @@ if (loginForm) {
             submitBtn.textContent = "Logging in...";
         }
         message.style.color = "#681313";
-        message.textContent = "Connecting to account...";
+        message.textContent = "Logging in...";
 
         try {
             await apiLogin(enteredEmail, enteredPassword);
@@ -135,7 +152,6 @@ if (loginForm) {
                     localStorage.setItem("careerai_user", JSON.stringify(user));
                 }
             } catch (userErr) {
-                console.warn("Could not fetch user profile details, using session defaults:", userErr);
                 const fallbackUser = {
                     email: enteredEmail,
                     name: enteredEmail.split("@")[0],
@@ -151,27 +167,10 @@ if (loginForm) {
 
             setTimeout(function () {
                 window.location.href = "dashboard.html";
-            }, 300);
+            }, 400);
 
         } catch (error) {
             console.error("Login attempt error:", error);
-
-            if (error.message && (error.message.includes("Failed to fetch") || error.message.includes("Unable to connect") || error.message.includes("no-server"))) {
-                message.style.color = "#681313";
-                message.textContent = "Backend is waking up. Launching session...";
-                const guestToken = "demo_token_" + Date.now();
-                setToken(guestToken);
-                const guestUser = {
-                    email: enteredEmail,
-                    name: enteredEmail.split("@")[0],
-                    user_type: "student",
-                };
-                localStorage.setItem("careerai_user", JSON.stringify(guestUser));
-                setTimeout(function () {
-                    window.location.href = "dashboard.html";
-                }, 400);
-                return;
-            }
 
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -184,9 +183,6 @@ if (loginForm) {
 }
 
 /* =========================
-
-
-
    CONFETTI
 
 
