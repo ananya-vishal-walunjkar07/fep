@@ -6,6 +6,7 @@ import time
 import speech_recognition as sr
 import numpy as np
 
+from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 
@@ -15,8 +16,11 @@ from google import genai
 # ============================================================
 
 load_dotenv()
+env_file = Path(__file__).resolve().parent / ".env"
+if env_file.exists():
+    load_dotenv(env_file)
 
-api_key = os.getenv("GEMINI_API_KEY")
+api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY2")
 client = None
 if api_key:
     try:
@@ -24,9 +28,9 @@ if api_key:
     except Exception as e:
         print("WARNING: Could not initialize Gemini client:", e)
 else:
-    print("INFO: GEMINI_API_KEY not set. AI interview endpoints will require GEMINI_API_KEY.")
+    print("INFO: GEMINI_API_KEY not set. AI interview will use fallback mode.")
 
-MODEL = "gemini-3.6-flash"
+MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 
 
 # ============================================================
@@ -198,57 +202,43 @@ def listen():
 # GEMINI HELPER
 # ============================================================
 
-def call_gemini(prompt, attempts=3):
+def call_gemini(prompt, attempts=2):
     """
-    Call Gemini with retry handling for temporary 503 errors.
+    Call Gemini with retry handling and model fallback.
     """
+    global client
     if client is None:
-        raise RuntimeError("GEMINI_API_KEY is not configured in .env.")
+        key = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY2")
+        if key:
+            try:
+                client = genai.Client(api_key=key)
+            except Exception:
+                pass
+    if client is None:
+        return ""
 
-    for attempt in range(1, attempts + 1):
+    candidate_models = [MODEL, "gemini-3.6-flash", "gemini-3.8-flash"]
+    models_to_try = []
+    for m in candidate_models:
+        if m and m not in models_to_try:
+            models_to_try.append(m)
 
-        try:
-
-            response = client.models.generate_content(
-                model=MODEL,
-                contents=prompt
-            )
-
-            if response and response.text:
-                return response.text.strip()
-
-            print("\nGemini returned an empty response.")
-
-        except Exception as e:
-
-            print(
-                f"\nGemini attempt {attempt}/{attempts} failed:"
-            )
-            print(e)
-
-            error_text = str(e)
-
-            if "503" in error_text or "UNAVAILABLE" in error_text:
-
-                if attempt < attempts:
-
-                    print(
-                        "\nGemini is temporarily busy."
-                        " Retrying in 3 seconds..."
-                    )
-
-                    time.sleep(3)
-
+    for current_model in models_to_try:
+        for attempt in range(1, attempts + 1):
+            try:
+                response = client.models.generate_content(
+                    model=current_model,
+                    contents=prompt
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as e:
+                err_str = str(e)
+                print(f"Gemini {current_model} attempt {attempt} notice: {e}")
+                if "503" in err_str or "UNAVAILABLE" in err_str:
+                    time.sleep(1)
                 else:
-
-                    print(
-                        "\nGemini is still unavailable."
-                    )
-
-            else:
-
-                break
-
+                    break
     return ""
 
 
@@ -563,6 +553,76 @@ def ask_next_question():
 # ============================================================
 # MAIN INTERVIEW
 # ============================================================
+
+
+
+# ============================================================
+# FEEDBACK & NEXT QUESTION GENERATOR
+# ============================================================
+
+def generate_feedback_and_next_question(answer: str):
+    """
+    Generate an intelligent, encouraging feedback acknowledging the candidate's answer,
+    followed by the natural next interview question.
+    """
+    missing = check_profile()
+    if not missing:
+        return (
+            "Fantastic! That gives us a complete and comprehensive picture of your professional background.",
+            ""
+        )
+
+    target_area = missing[0]
+
+    # Try Gemini first for personalized, context-aware conversational feedback
+    if client:
+        try:
+            summary = {
+                "target_roles": profile.get("target_roles"),
+                "user_type": profile.get("user_type"),
+                "skills": profile.get("skills", [])[:5],
+                "education": profile.get("education", [])[:1],
+                "projects": [p.get("name") for p in profile.get("projects", []) if isinstance(p, dict)],
+            }
+            prompt = f"""You are Cara, the supportive, encouraging, and intelligent AI career interviewer for CareerAI.
+The candidate just gave this response: "{answer}"
+Candidate profile summary so far: {json.dumps(summary)}
+Next missing profile area needed: {target_area}
+
+Provide an interactive, empathetic response in JSON format with exactly two keys:
+1. "feedback": A warm, encouraging 1-2 sentence acknowledgment directly referencing what they specifically stated (validate their achievements, specific technologies, domain, or aspirations).
+2. "next_question": An engaging, professional interview question to gather information about {target_area}.
+
+Return ONLY raw JSON with keys "feedback" and "next_question"."""
+
+            raw = call_gemini(prompt)
+            if raw:
+                cleaned = raw.replace("```json", "").replace("```", "").strip()
+                data = json.loads(cleaned)
+                fb = data.get("feedback", "").strip()
+                nq = data.get("next_question", "").strip()
+                if fb and nq:
+                    return fb, nq
+        except Exception as e:
+            print("Feedback generation notice:", e)
+
+    # Contextual heuristic fallback:
+    ans_lower = answer.lower()
+    if any(k in ans_lower for k in ["engineer", "developer", "designer", "manager", "data", "analyst", "ai", "ml", "frontend", "backend", "full stack", "cloud", "devops"]):
+        fallback_fb = "That is an exciting career path with great demand in the industry!"
+    elif any(k in ans_lower for k in ["student", "graduate", "fresher", "college", "university", "btech", "b.tech", "bca", "mca", "b.sc"]):
+        fallback_fb = "Great! Academic foundation and hands-on learning are wonderful assets."
+    elif any(k in ans_lower for k in ["python", "java", "react", "sql", "javascript", "c++", "aws", "docker", "node", "html", "css", "machine learning"]):
+        fallback_fb = "Those are impressive and highly relevant technical skills to highlight on your resume."
+    elif any(k in ans_lower for k in ["built", "project", "app", "system", "website", "developed", "created"]):
+        fallback_fb = "Hands-on projects are one of the most effective ways to demonstrate real-world impact to employers."
+    elif any(k in ans_lower for k in ["intern", "experience", "work", "job", "company", "team", "client"]):
+        fallback_fb = "Practical work experience gives you great leverage when positioning your profile."
+    else:
+        fallback_fb = "Thank you for sharing that! That gives valuable clarity for building your resume."
+
+    fallback_nq = ask_next_question()
+    return fallback_fb, fallback_nq
 
 def main():
 

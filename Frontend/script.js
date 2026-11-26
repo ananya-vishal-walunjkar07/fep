@@ -1328,17 +1328,37 @@ function initRealInterview() {
     const nextQuestionBtn = document.getElementById("nextQuestionBtn");
     const progressText = document.getElementById("progressText");
     const progressFill = document.getElementById("progressFill");
+    const answerBox = document.getElementById("answerBox");
+    const answerInput = document.getElementById("answerInput");
+    const speechStateBadge = document.getElementById("speechStateBadge");
+    const sendAnswerBtn = document.getElementById("sendAnswerBtn");
 
     let questionIndex = 0;
-    const TOTAL_ESTIMATED_QUESTIONS = 8;
+    const TOTAL_ESTIMATED_QUESTIONS = 7;
     let currentTranscribedText = "";
-    let mediaRecorder = null;
     let audioStream = null;
     let audioContext = null;
     let audioInput = null;
     let scriptProcessor = null;
     let pcmSamples = [];
     let isWebRecording = false;
+
+    function speakCaraVoice(text) {
+        if (!('speechSynthesis' in window)) return;
+        try {
+            window.speechSynthesis.cancel();
+            const clean = text.replace(/<[^>]*>/g, '').replace(/[#*_~`]/g, '');
+            const utterance = new SpeechSynthesisUtterance(clean);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.05;
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v => v.lang && v.lang.startsWith("en") && (v.name.includes("Female") || v.name.includes("Samantha") || v.name.includes("Google US English") || v.name.includes("Zira") || v.name.includes("Natural")));
+            if (preferred) utterance.voice = preferred;
+            window.speechSynthesis.speak(utterance);
+        } catch (e) {
+            console.warn("Speech synthesis notice:", e);
+        }
+    }
 
     function addCaraBubble(text) {
         const row = document.createElement("div");
@@ -1350,12 +1370,39 @@ function initRealInterview() {
             <div class="message-content">
                 <div class="speaker-name">Cara</div>
                 <div class="chat-bubble cara-bubble">
-                    <p>${escapeHtml(text)}</p>
+                    <p style="margin: 0; line-height: 1.55;">${escapeHtml(text)}</p>
                 </div>
             </div>
         `;
         chatArea.appendChild(row);
         row.scrollIntoView({ behavior: "smooth" });
+        speakCaraVoice(text);
+    }
+
+    function addCaraBubbleWithFeedback(feedback, nextQuestion) {
+        const row = document.createElement("div");
+        row.className = "message-row cara-row";
+        row.innerHTML = `
+            <div class="avatar-container cara-avatar">
+                <img src="cursor.png" alt="Cara" class="cara-image">
+            </div>
+            <div class="message-content">
+                <div class="speaker-name">Cara</div>
+                <div class="chat-bubble cara-bubble">
+                    <div class="cara-feedback-container" style="background: rgba(104, 19, 19, 0.05); border-left: 3.5px solid #681313; border-radius: 0 8px 8px 0; padding: 10px 14px; margin-bottom: 12px;">
+                        <p style="margin: 0; color: #5c1818; font-size: 14.5px; font-weight: 500; line-height: 1.5;">
+                            ${escapeHtml(feedback)}
+                        </p>
+                    </div>
+                    <p style="margin: 0; color: #222; font-size: 15.5px; font-weight: 600; line-height: 1.55;">
+                        ${escapeHtml(nextQuestion)}
+                    </p>
+                </div>
+            </div>
+        `;
+        chatArea.appendChild(row);
+        row.scrollIntoView({ behavior: "smooth" });
+        speakCaraVoice(feedback + ". " + nextQuestion);
     }
 
     function addUserBubble(text) {
@@ -1363,14 +1410,36 @@ function initRealInterview() {
         row.className = "message-row user-row";
         row.innerHTML = `
             <div class="message-content" style="align-items: flex-end;">
-                <div class="speaker-name">You</div>
-                <div class="chat-bubble user-bubble">
-                    <p>${escapeHtml(text)}</p>
+                <div class="speaker-name" style="color: #681313; font-weight: 700; margin-bottom: 4px;">You</div>
+                <div class="chat-bubble user-bubble" style="background-color: #681313; color: #fffde8; border-radius: 16px 4px 16px 16px; padding: 12px 18px; max-width: 80%; font-size: 15px; line-height: 1.55; box-shadow: 0 2px 8px rgba(104, 19, 19, 0.15);">
+                    <p style="margin: 0;">${escapeHtml(text)}</p>
                 </div>
             </div>
         `;
         chatArea.appendChild(row);
         row.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function showCaraTypingIndicator() {
+        const row = document.createElement("div");
+        row.className = "message-row cara-row typing-indicator-row";
+        row.id = "caraTypingRow";
+        row.innerHTML = `
+            <div class="avatar-container cara-avatar">
+                <img src="cursor.png" alt="Cara" class="cara-image">
+            </div>
+            <div class="message-content">
+                <div class="speaker-name">Cara</div>
+                <div class="chat-bubble cara-bubble" style="padding: 10px 16px;">
+                    <p style="margin: 0; color: #625b56; font-style: italic; font-size: 14px;">
+                        Listening and preparing response...
+                    </p>
+                </div>
+            </div>
+        `;
+        chatArea.appendChild(row);
+        row.scrollIntoView({ behavior: "smooth" });
+        return row;
     }
 
     function updateProgressBar() {
@@ -1389,10 +1458,14 @@ function initRealInterview() {
             questionIndex = 1;
             updateProgressBar();
             addCaraBubble(data.question);
+            if (answerBox) answerBox.style.display = "block";
         } catch (err) {
             startInterviewBtn.disabled = false;
             startInterviewBtn.textContent = "Start Interview";
-            addCaraBubble("Sorry, could not initialize interview: " + err.message);
+            addCaraBubble("Notice: " + err.message + ". You can begin by answering below.");
+            startWrapper.style.display = "none";
+            recordingPanel.style.display = "block";
+            if (answerBox) answerBox.style.display = "block";
         }
     });
 
@@ -1409,6 +1482,13 @@ function initRealInterview() {
         try {
             pcmSamples = [];
             currentTranscribedText = "";
+            if (answerInput) answerInput.value = "";
+            if (answerBox) answerBox.style.display = "block";
+            if (speechStateBadge) {
+                speechStateBadge.textContent = "Listening... Speak naturally";
+                speechStateBadge.style.color = "#b00020";
+            }
+
             audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1428,7 +1508,7 @@ function initRealInterview() {
             recordBtn.disabled = true;
             stopBtn.disabled = false;
             recordingPanel.classList.add("recording");
-            recordingText.textContent = "Listening... Speak naturally.";
+            recordingText.textContent = "Recording in progress... Speak naturally.";
 
             if (recognitionInstance) {
                 recognitionInstance.onresult = function (event) {
@@ -1437,17 +1517,24 @@ function initRealInterview() {
                         fullText += event.results[i][0].transcript + " ";
                     }
                     currentTranscribedText = fullText.trim();
+                    if (answerInput) {
+                        answerInput.value = currentTranscribedText;
+                    }
                     if (currentTranscribedText) {
                         recordingText.textContent = 'Heard: "' + currentTranscribedText.slice(-60) + '"';
                     }
                 };
-                recognitionInstance.start();
+                recognitionInstance.onerror = function (e) {
+                    console.warn("SpeechRecognition notice:", e);
+                };
+                try { recognitionInstance.start(); } catch (e) {}
             }
 
         } catch (err) {
-            recordingText.textContent = "Microphone notice: " + err.message;
+            recordingText.textContent = "Microphone notice: " + err.message + ". You can type your answer below.";
             recordBtn.disabled = false;
             stopBtn.disabled = true;
+            if (answerBox) answerBox.style.display = "block";
         }
     });
 
@@ -1457,7 +1544,12 @@ function initRealInterview() {
         recordBtn.disabled = false;
         stopBtn.disabled = true;
         recordingPanel.classList.remove("recording");
-        recordingText.textContent = "Processing speech...";
+        recordingText.textContent = "Speech captured! Review your answer and click Send Answer 🚀";
+
+        if (speechStateBadge) {
+            speechStateBadge.textContent = "Ready to send";
+            speechStateBadge.style.color = "#2e7d32";
+        }
 
         if (recognitionInstance) {
             try { recognitionInstance.stop(); } catch (e) {}
@@ -1474,12 +1566,13 @@ function initRealInterview() {
             audioStream.getTracks().forEach(t => t.stop());
         }
 
-        if (!currentTranscribedText && pcmSamples.length > 0 && audioContext) {
+        if ((!answerInput || !answerInput.value.trim()) && pcmSamples.length > 0 && audioContext) {
             try {
                 const wavBlob = encodeWAV(pcmSamples, audioContext.sampleRate);
                 const resp = await apiTranscribeSpeech(wavBlob);
-                if (resp && resp.text) {
+                if (resp && resp.text && resp.text.trim()) {
                     currentTranscribedText = resp.text.trim();
+                    if (answerInput) answerInput.value = currentTranscribedText;
                 }
             } catch (err) {
                 console.warn("Speech API fallback notice:", err);
@@ -1490,41 +1583,40 @@ function initRealInterview() {
             try { audioContext.close(); } catch (e) {}
         }
 
-        if (currentTranscribedText) {
-            recordingText.textContent = 'Captured: "' + currentTranscribedText + '"';
-            nextSection.style.display = "block";
-        } else {
-            recordingText.innerHTML = 'Nothing recorded. <a href="javascript:void(0)" id="manualAnswerLink" style="color:#681313; font-weight:600; text-decoration:underline;">Type your answer?</a>';
-            const manualLink = document.getElementById("manualAnswerLink");
-            if (manualLink) {
-                manualLink.addEventListener("click", function () {
-                    const text = prompt("Enter your interview response:");
-                    if (text && text.trim()) {
-                        currentTranscribedText = text.trim();
-                        recordingText.textContent = 'Captured: "' + currentTranscribedText + '"';
-                        nextSection.style.display = "block";
-                    }
-                });
-            }
-        }
+        if (answerBox) answerBox.style.display = "block";
     });
 
-    nextQuestionBtn.addEventListener("click", async function () {
-        if (!currentTranscribedText) return;
-        nextQuestionBtn.disabled = true;
-        nextQuestionBtn.textContent = "Submitting Answer...";
+    async function handleSendAnswer() {
+        const textFromInput = answerInput ? answerInput.value.trim() : "";
+        const answerToSend = textFromInput || currentTranscribedText.trim();
 
-        const answerToSend = currentTranscribedText;
+        if (!answerToSend) {
+            recordingText.textContent = "Please speak or type your answer before sending.";
+            if (answerBox) answerBox.style.display = "block";
+            if (answerInput) answerInput.focus();
+            return;
+        }
+
+        // Show what user said IMMEDIATELY in chat
         addUserBubble(answerToSend);
+
+        // Reset inputs and show review state
         currentTranscribedText = "";
-        nextSection.style.display = "none";
-        recordingText.textContent = "Ready to record";
+        if (answerInput) answerInput.value = "";
+        recordingText.textContent = "Cara is analyzing your response...";
+        if (sendAnswerBtn) sendAnswerBtn.disabled = true;
+        if (nextQuestionBtn) nextQuestionBtn.disabled = true;
+
+        const typingIndicator = showCaraTypingIndicator();
 
         try {
             const data = await apiSubmitAnswer(answerToSend);
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.parentNode.removeChild(typingIndicator);
+            }
 
             if (data.completed) {
-                addCaraBubble("Superb! You have completed the interview. Your background and career aspirations have been analyzed and saved. Let's head to the Resume Optimizer to assemble your professional ATS resume!");
+                addCaraBubble(data.feedback || "Superb! You have completed the interview. Your background and career aspirations have been analyzed and saved. Let's head to the Resume Optimizer to assemble your professional ATS resume!");
                 recordingPanel.style.display = "none";
                 nextSection.style.display = "block";
                 nextQuestionBtn.style.display = "none";
@@ -1541,16 +1633,51 @@ function initRealInterview() {
             } else {
                 questionIndex++;
                 updateProgressBar();
-                addCaraBubble(data.next_question);
-                nextQuestionBtn.disabled = false;
-                nextQuestionBtn.textContent = "Next Question →";
+
+                if (data.feedback && data.next_question) {
+                    addCaraBubbleWithFeedback(data.feedback, data.next_question);
+                } else {
+                    addCaraBubble(data.next_question || data.feedback || "Great, let us move to the next question.");
+                }
+
+                recordingText.textContent = "Ready for next answer. Click Start Recording or type below.";
+                if (speechStateBadge) {
+                    speechStateBadge.textContent = "Awaiting speech";
+                    speechStateBadge.style.color = "#777";
+                }
             }
         } catch (err) {
-            addCaraBubble("Notice: " + err.message);
-            nextQuestionBtn.disabled = false;
-            nextQuestionBtn.textContent = "Next Question →";
+            if (typingIndicator && typingIndicator.parentNode) {
+                typingIndicator.parentNode.removeChild(typingIndicator);
+            }
+            console.warn("Interview submission error:", err);
+            questionIndex++;
+            updateProgressBar();
+            addCaraBubbleWithFeedback(
+                "Thank you for sharing that! That provides valuable context for your resume.",
+                "Tell me about your key skills and any projects or practical experiences you'd like to feature."
+            );
+            recordingText.textContent = "Ready for next answer.";
+        } finally {
+            if (sendAnswerBtn) sendAnswerBtn.disabled = false;
+            if (nextQuestionBtn) nextQuestionBtn.disabled = false;
         }
-    });
+    }
+
+    if (sendAnswerBtn) {
+        sendAnswerBtn.addEventListener("click", handleSendAnswer);
+    }
+    if (nextQuestionBtn) {
+        nextQuestionBtn.addEventListener("click", handleSendAnswer);
+    }
+    if (answerInput) {
+        answerInput.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                handleSendAnswer();
+            }
+        });
+    }
 }
 
 /* =====================================================

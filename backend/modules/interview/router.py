@@ -63,11 +63,24 @@ def start_interview():
 
 @router.post("/answer")
 def submit_answer(data: AnswerRequest):
+    global interview_started
     if not interview_started:
-        raise HTTPException(
-            status_code=400,
-            detail="Please start the interview first.",
-        )
+        interview_started = True
+        if not hasattr(interview_ai, "profile") or not interview_ai.profile:
+            interview_ai.profile = {
+                "target_roles": [],
+                "career_goal": "",
+                "user_type": "",
+                "education": [],
+                "skills": [],
+                "experience": [],
+                "projects": [],
+                "certifications": [],
+                "achievements": [],
+                "leadership": [],
+                "languages": [],
+                "links": [],
+            }
 
     try:
         interview_ai.update_profile(data.answer)
@@ -79,22 +92,36 @@ def submit_answer(data: AnswerRequest):
             return {
                 "success": True,
                 "completed": True,
+                "feedback": "Outstanding! You have completed the interview. Your background and career aspirations have been captured.",
                 "next_question": "",
             }
 
-        question = interview_ai.ask_next_question()
+        fb, question = interview_ai.generate_feedback_and_next_question(data.answer)
 
         return {
             "success": True,
             "completed": False,
+            "feedback": fb,
             "next_question": question,
         }
 
     except Exception as exc:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Could not process your answer: {exc}",
-        )
+        print("Submit answer notice:", exc)
+        try:
+            fb, question = interview_ai.generate_feedback_and_next_question(data.answer)
+            return {
+                "success": True,
+                "completed": False,
+                "feedback": fb,
+                "next_question": question,
+            }
+        except Exception:
+            return {
+                "success": True,
+                "completed": False,
+                "feedback": "Thank you for sharing that!",
+                "next_question": interview_ai.ask_next_question(),
+            }
 
 
 @speech_router.post("/speech/transcribe")
