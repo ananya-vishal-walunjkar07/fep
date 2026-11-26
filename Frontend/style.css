@@ -6183,7 +6183,7 @@ select:focus-visible {
 .why-fear-popup {
     display: inline-block;
     color: var(--red-accent, #7A1F1F);
-    font-size: 14.5px;
+    font-size: 18px;
     font-weight: 800;
     letter-spacing: 2.2px;
     text-transform: uppercase;
